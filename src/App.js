@@ -1,8 +1,17 @@
 import React from "react";
+import { BrowserRouter as Router, Switch, Route, Link } from "react-router-dom";
 import "./App.css";
 import "./style.css";
+import { ReadData } from "./ReadData";
+import { useNavigate } from "react-router-dom";
 
 const App = () => {
+  const navigate = useNavigate();
+
+  const ClickReadData = () => {
+    navigate.push("/ReadData");
+  };
+
   return (
     <html>
       <head>
@@ -192,6 +201,23 @@ const App = () => {
           }}
         ></div>
       </body>
+
+      <br />
+
+      <button
+        style={{
+          border: "3px solid black",
+          padding: "5px",
+          margin: "10px",
+          width: "75px",
+          height: "180px",
+          float: "center",
+          width: "250px",
+        }}
+        onClick={ClickReadData}
+      >
+        Read Data
+      </button>
     </html>
   );
 };
