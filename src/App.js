@@ -81,7 +81,11 @@ const App = () => {
         new THREE.Float32BufferAttribute(positions, 3)
       );
 
-      const material = new THREE.PointsMaterial({ color: 0xffffff });
+      const material = new THREE.PointsMaterial({
+        color: 0xffffff,
+
+        linewidth: 1,
+      });
 
       // 점 클라우드 생성
       pointCloud = new THREE.Points(geometry, material);
