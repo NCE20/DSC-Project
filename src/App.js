@@ -14,6 +14,10 @@ const App = () => {
   const isRightMouseDownRef = useRef(false);
   const previousMousePositionRef = useRef({ x: 0, y: 0 });
 
+  ////
+
+  ////
+
   useEffect(() => {
     // 파일을 불러오는 비동기 함수
     const readFile = async () => {
@@ -42,7 +46,8 @@ const App = () => {
 
     //
 
-    let scene, renderer, pointCloud;
+    let scene, renderer;
+    let cubes = []; // 큐브들을 담을 배열
 
     const init = () => {
       // 씬 생성
@@ -60,36 +65,29 @@ const App = () => {
 
       // WebGL 렌더러 생성
       renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current });
-      // renderer.setSize(window.innerWidth, window.innerHeight);
+      //renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.setSize(1000, 750);
 
-      // 점 생성
-      const geometry = new THREE.BufferGeometry();
-      const positions = [];
+      // 큐브들 생성
+      for (let i = 0; i < 100; i++) {
+        const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+        const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const cube = new THREE.Mesh(geometry, material);
 
-      // 점 좌표 설정 (여기서는 랜덤 좌표 사용)
-      for (let i = 0; i < 1000; i++) {
-        const x = Math.random() * 10 - 5;
-        const y = Math.random() * 10 - 5;
-        const z = Math.random() * 10 - 5;
+        // 랜덤한 위치 설정
+        cube.position.x = Math.random() * 10 - 5;
+        cube.position.y = Math.random() * 10 - 5;
+        cube.position.z = Math.random() * 10 - 5;
 
-        positions.push(x, y, z);
+        cubes.push(cube);
+        scene.add(cube);
+
+        // 윤곽선 생성
+        const edges = new THREE.EdgesGeometry(geometry);
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+        const wireframe = new THREE.LineSegments(edges, lineMaterial);
+        cube.add(wireframe);
       }
-
-      geometry.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(positions, 3)
-      );
-
-      const material = new THREE.PointsMaterial({
-        color: 0xffffff,
-
-        linewidth: 1,
-      });
-
-      // 점 클라우드 생성
-      pointCloud = new THREE.Points(geometry, material);
-      scene.add(pointCloud);
 
       // 이벤트 리스너 등록
       window.addEventListener("resize", handleWindowResize);
@@ -129,7 +127,6 @@ const App = () => {
       const mouseY = event.clientY;
 
       if (isLeftMouseDownRef.current) {
-        // 마우스 왼쪽 클릭 상태에서의 동작 구현
         const movementSpeed = 0.01;
         const camera = cameraRef.current;
 
@@ -144,8 +141,17 @@ const App = () => {
         const deltaX = mouseX - previousMousePositionRef.current.x;
         const deltaY = mouseY - previousMousePositionRef.current.y;
 
-        camera.position.x += deltaX * movementSpeed;
-        camera.position.y -= deltaY * movementSpeed;
+        // 현재 카메라의 회전 각도를 적용한 이동 벡터 계산
+        const rotationMatrix = new THREE.Matrix4().makeRotationFromQuaternion(
+          camera.quaternion
+        );
+        const movementVector = new THREE.Vector3(
+          deltaX,
+          -deltaY,
+          0
+        ).applyMatrix4(rotationMatrix);
+
+        camera.position.add(movementVector.multiplyScalar(movementSpeed));
 
         previousMousePositionRef.current = { x: mouseX, y: mouseY };
       } else if (isRightMouseDownRef.current) {
@@ -172,21 +178,31 @@ const App = () => {
     };
 
     const handleMouseWheel = (event) => {
-      const delta = Math.max(-1, Math.min(1, event.deltaY));
+      const delta = Math.max(-10, Math.min(10, event.deltaY));
       const zoomSpeed = 0.1;
 
       const camera = cameraRef.current;
 
       // 마우스 휠 방향에 따라 카메라의 위치 조정하여 확대 또는 축소
-      camera.position.z += delta * zoomSpeed;
+      const rotationMatrix = new THREE.Matrix4().makeRotationFromQuaternion(
+        camera.quaternion
+      );
+      const zoomVector = new THREE.Vector3(
+        0,
+        0,
+        delta * zoomSpeed
+      ).applyMatrix4(rotationMatrix);
+
+      camera.position.add(zoomVector);
 
       // 카메라의 z 좌표 제한 설정 (확대/축소 범위 제한)
-      camera.position.z = Math.max(1, Math.min(10, camera.position.z));
+      camera.position.z = Math.max(-10, Math.min(100, camera.position.z));
     };
 
     const handleContextMenu = (event) => {
       event.preventDefault(); // 기본 동작(팝업 메뉴 표시) 막기
     };
+
     const animate = () => {
       requestAnimationFrame(animate);
       renderer.render(scene, cameraRef.current);
