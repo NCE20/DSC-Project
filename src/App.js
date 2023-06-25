@@ -1,11 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { BrowserRouter as Router, Switch, Route, Link } from "react-router-dom";
+import * as THREE from "three";
 import "./App.css";
 import "./style.css";
 
 const App = () => {
   const [nodeContent, setnodeContent] = useState("");
   const [linkContent, setlinkContent] = useState("");
+
+  const canvasRef = useRef(null);
+  const cameraRef = useRef(null);
+  const isLeftMouseDownRef = useRef(false);
+  const isRightMouseDownRef = useRef(false);
+  const previousMousePositionRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     // 파일을 불러오는 비동기 함수
@@ -32,6 +39,165 @@ const App = () => {
     };
 
     readFile();
+
+    //
+
+    let scene, renderer, pointCloud;
+
+    const init = () => {
+      // 씬 생성
+      scene = new THREE.Scene();
+
+      // 카메라 생성 및 초기 위치 설정
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.z = 5;
+      cameraRef.current = camera;
+
+      // WebGL 렌더러 생성
+      renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current });
+      // renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(1000, 750);
+
+      // 점 생성
+      const geometry = new THREE.BufferGeometry();
+      const positions = [];
+
+      // 점 좌표 설정 (여기서는 랜덤 좌표 사용)
+      for (let i = 0; i < 1000; i++) {
+        const x = Math.random() * 10 - 5;
+        const y = Math.random() * 10 - 5;
+        const z = Math.random() * 10 - 5;
+
+        positions.push(x, y, z);
+      }
+
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+
+      const material = new THREE.PointsMaterial({ color: 0xffffff });
+
+      // 점 클라우드 생성
+      pointCloud = new THREE.Points(geometry, material);
+      scene.add(pointCloud);
+
+      // 이벤트 리스너 등록
+      window.addEventListener("resize", handleWindowResize);
+      canvasRef.current?.addEventListener("mousedown", handleMouseDown);
+      canvasRef.current?.addEventListener("mouseup", handleMouseUp);
+      canvasRef.current?.addEventListener("mousemove", handleMouseMove);
+      canvasRef.current?.addEventListener("wheel", handleMouseWheel);
+      canvasRef.current?.addEventListener("contextmenu", handleContextMenu); // 우클릭 이벤트 처리
+    };
+
+    const handleWindowResize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      cameraRef.current.aspect = width / height;
+      cameraRef.current.updateProjectionMatrix();
+
+      renderer.setSize(width, height);
+    };
+
+    const handleMouseDown = (event) => {
+      if (event.button === 0) {
+        isLeftMouseDownRef.current = true;
+      } else if (event.button === 2) {
+        isRightMouseDownRef.current = true;
+      }
+    };
+
+    const handleMouseUp = () => {
+      isLeftMouseDownRef.current = false;
+      isRightMouseDownRef.current = false;
+      previousMousePositionRef.current = { x: 0, y: 0 };
+    };
+
+    const handleMouseMove = (event) => {
+      const mouseX = event.clientX;
+      const mouseY = event.clientY;
+
+      if (isLeftMouseDownRef.current) {
+        // 마우스 왼쪽 클릭 상태에서의 동작 구현
+        const movementSpeed = 0.01;
+        const camera = cameraRef.current;
+
+        if (
+          previousMousePositionRef.current.x === 0 &&
+          previousMousePositionRef.current.y === 0
+        ) {
+          previousMousePositionRef.current = { x: mouseX, y: mouseY };
+          return;
+        }
+
+        const deltaX = mouseX - previousMousePositionRef.current.x;
+        const deltaY = mouseY - previousMousePositionRef.current.y;
+
+        camera.position.x += deltaX * movementSpeed;
+        camera.position.y -= deltaY * movementSpeed;
+
+        previousMousePositionRef.current = { x: mouseX, y: mouseY };
+      } else if (isRightMouseDownRef.current) {
+        // 마우스 우클릭 상태에서의 동작 구현
+        const rotationSpeed = 0.01;
+        const camera = cameraRef.current;
+
+        if (
+          previousMousePositionRef.current.x === 0 &&
+          previousMousePositionRef.current.y === 0
+        ) {
+          previousMousePositionRef.current = { x: mouseX, y: mouseY };
+          return;
+        }
+
+        const deltaX = mouseX - previousMousePositionRef.current.x;
+        const deltaY = mouseY - previousMousePositionRef.current.y;
+
+        camera.rotation.y += deltaX * rotationSpeed;
+        camera.rotation.x += deltaY * rotationSpeed;
+
+        previousMousePositionRef.current = { x: mouseX, y: mouseY };
+      }
+    };
+
+    const handleMouseWheel = (event) => {
+      const delta = Math.max(-1, Math.min(1, event.deltaY));
+      const zoomSpeed = 0.1;
+
+      const camera = cameraRef.current;
+
+      // 마우스 휠 방향에 따라 카메라의 위치 조정하여 확대 또는 축소
+      camera.position.z += delta * zoomSpeed;
+
+      // 카메라의 z 좌표 제한 설정 (확대/축소 범위 제한)
+      camera.position.z = Math.max(1, Math.min(10, camera.position.z));
+    };
+
+    const handleContextMenu = (event) => {
+      event.preventDefault(); // 기본 동작(팝업 메뉴 표시) 막기
+    };
+    const animate = () => {
+      requestAnimationFrame(animate);
+      renderer.render(scene, cameraRef.current);
+    };
+
+    init();
+    animate();
+
+    return () => {
+      window.removeEventListener("resize", handleWindowResize);
+      canvasRef.current?.removeEventListener("mousedown", handleMouseDown);
+      canvasRef.current?.removeEventListener("mouseup", handleMouseUp);
+      canvasRef.current?.removeEventListener("mousemove", handleMouseMove);
+      canvasRef.current?.removeEventListener("wheel", handleMouseWheel);
+    };
   }, []);
 
   return (
@@ -52,7 +218,6 @@ const App = () => {
               width: "300px",
               height: "750px",
               float: "left",
-              width: "20%",
             }}
           >
             <select
@@ -217,27 +382,17 @@ const App = () => {
               border: "3px solid black",
               padding: "10px",
               margin: "20px",
-              width: "300px",
+              width: "1000px",
               height: "750px",
               float: "left",
-              width: "1000px",
             }}
-          ></div>
+          >
+            <canvas ref={canvasRef} />
+          </div>
         </header>
         <br />
 
-        <footer>
-          <div>
-            <div>
-              <h1>노드 데이터</h1>
-              <pre>{nodeContent}</pre>
-            </div>
-            <div>
-              <h1>링크 데이터</h1>
-              <pre>{linkContent}</pre>
-            </div>
-          </div>
-        </footer>
+        <footer>"footer"</footer>
       </body>
     </html>
   );
